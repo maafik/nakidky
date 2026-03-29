@@ -46,7 +46,18 @@ if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL))
   exit;
 }
 
-if ($amountRub < 1 || $amountRub > 500000) {
+$firstName = isset($input['customer_first_name']) ? trim((string) $input['customer_first_name']) : '';
+$lastName = isset($input['customer_last_name']) ? trim((string) $input['customer_last_name']) : '';
+$deliveryAddress = isset($input['delivery_address']) ? trim((string) $input['delivery_address']) : '';
+$rearSeat = !empty($input['rear_seat']);
+$lenFn = function_exists('mb_strlen') ? 'mb_strlen' : 'strlen';
+if ($lenFn($firstName) < 2 || $lenFn($lastName) < 2 || $lenFn($deliveryAddress) < 5) {
+  http_response_code(400);
+  echo json_encode(['error' => 'Укажите имя, фамилию и адрес доставки'], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
+if (!is_finite($amountRub) || $amountRub < 1 || $amountRub > 500000) {
   http_response_code(400);
   echo json_encode(['error' => 'Некорректная сумма'], JSON_UNESCAPED_UNICODE);
   exit;
@@ -89,6 +100,12 @@ $payload = [
   ],
   'capture' => true,
   'description' => $description,
+  'metadata' => [
+    'customer_first_name' => function_exists('mb_substr') ? mb_substr($firstName, 0, 200) : substr($firstName, 0, 200),
+    'customer_last_name' => function_exists('mb_substr') ? mb_substr($lastName, 0, 200) : substr($lastName, 0, 200),
+    'delivery_address' => function_exists('mb_substr') ? mb_substr($deliveryAddress, 0, 500) : substr($deliveryAddress, 0, 500),
+    'rear_seat' => $rearSeat ? 'yes' : 'no',
+  ],
   'receipt' => [
     'customer' => [
       'email' => $customerEmail,
@@ -156,6 +173,39 @@ if (!$ok) {
   http_response_code(502);
   echo json_encode(['error' => $msg, 'http' => $code], JSON_UNESCAPED_UNICODE);
   exit;
+}
+
+$tgToken = getenv('TELEGRAM_BOT_TOKEN') ?: '';
+$tgChat = getenv('TELEGRAM_CHAT_ID') ?: '';
+if ($tgToken !== '' && $tgChat !== '') {
+  $tgText = "🛒 Новый заказ (платёж создан, клиент переходит к оплате)\n"
+    . 'Товар: ' . $description . "\n"
+    . 'Сумма: ' . (string) (int) round($amountRub) . " ₽\n"
+    . 'Имя: ' . $firstName . "\n"
+    . 'Фамилия: ' . $lastName . "\n"
+    . 'Email: ' . $customerEmail . "\n"
+    . 'Адрес: ' . $deliveryAddress . "\n"
+    . 'Задний ряд (+2000 ₽): ' . ($rearSeat ? 'да' : 'нет');
+  $tgPayload = json_encode(
+    [
+      'chat_id' => $tgChat,
+      'text' => $tgText,
+      'disable_web_page_preview' => true,
+    ],
+    JSON_UNESCAPED_UNICODE
+  );
+  if (is_string($tgPayload)) {
+    $chTg = curl_init('https://api.telegram.org/bot' . $tgToken . '/sendMessage');
+    curl_setopt_array($chTg, [
+      CURLOPT_POST => true,
+      CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+      CURLOPT_POSTFIELDS => $tgPayload,
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_TIMEOUT => 10,
+    ]);
+    curl_exec($chTg);
+    curl_close($chTg);
+  }
 }
 
 echo json_encode(['confirmation_url' => $confirmUrl], JSON_UNESCAPED_UNICODE);

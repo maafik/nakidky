@@ -137,44 +137,107 @@
 let selectedItem = {};
 let totalPrice = 0;
 
+/** Клик по карточке: сначала попап с превью товара */
 function openOrder(image, title, price) {
-  // сохраняем выбранный товар
   selectedItem = { image, title, price: parseInt(price, 10) };
+  totalPrice = selectedItem.price;
 
-  // показываем попап
-  const popup = document.getElementById('orderPopup');
-  popup.style.display = 'flex';
+  document.getElementById('popupPreviewImage').src = image;
+  document.getElementById('popupPreviewTitle').innerText = title;
 
-  // подставляем данные
-  document.getElementById('popupImage').src = image;
-  document.getElementById('popupTitle').innerText = title;
+  document.getElementById('orderPopup').style.display = 'none';
 
-  // сбрасываем чекбокс
   const rearSeatCheckbox = document.getElementById('backSeatCheckbox');
-  rearSeatCheckbox.checked = false;
+  if (rearSeatCheckbox) rearSeatCheckbox.checked = false;
   const policyCheckbox = document.getElementById('policyAgree');
   const returnCheckbox = document.getElementById('returnAgree');
   if (policyCheckbox) policyCheckbox.checked = false;
   if (returnCheckbox) returnCheckbox.checked = false;
   const emailInput = document.getElementById('customerEmail');
   if (emailInput) emailInput.value = '';
+  updatePrice();
+  updateConsentStatus();
 
-  // ставим базовую цену для товара
-  totalPrice = selectedItem.price;
+  const preview = document.getElementById('orderPopupPreview');
+  preview.style.display = 'flex';
+  preview.onclick = function (event) {
+    if (event.target === preview) {
+      closeOrderPreview();
+    }
+  };
+}
+
+function closeOrderPreview(event) {
+  if (event) event.stopPropagation();
+  const p = document.getElementById('orderPopupPreview');
+  if (p) p.style.display = 'none';
+}
+
+/** Из превью — ко второму попапу с формой и оплатой */
+function proceedToCheckoutForm(event) {
+  if (event) event.stopPropagation();
+  const policyCheckbox = document.getElementById('policyAgree');
+  const returnCheckbox = document.getElementById('returnAgree');
+  const checksOk = policyCheckbox && returnCheckbox ? (policyCheckbox.checked && returnCheckbox.checked) : true;
+  if (!checksOk) {
+    alert('Отметьте согласие с политикой конфиденциальности и условиями возврата.');
+    return;
+  }
+  if (!isValidCustomerEmail()) {
+    alert('Укажите корректный email для чека (54‑ФЗ).');
+    return;
+  }
+  closeOrderPreview();
+  openOrderForm();
+}
+
+function openOrderForm() {
+  const popup = document.getElementById('orderPopup');
+  popup.style.display = 'flex';
+
+  document.getElementById('popupImage').src = selectedItem.image;
+  document.getElementById('popupTitle').innerText = selectedItem.title;
+
+  const fn = document.getElementById('customerFirstName');
+  const ln = document.getElementById('customerLastName');
+  const addr = document.getElementById('deliveryAddress');
+  if (fn) fn.value = '';
+  if (ln) ln.value = '';
+  if (addr) addr.value = '';
 
   updatePrice();
   updateConsentStatus();
 
-  // закрытие по клику вне окна
   popup.onclick = function (event) {
     if (event.target === popup) {
-      closeOrder();
+      backToProductPreview();
+    }
+  };
+}
+
+/** Из формы — назад к превью товара */
+function backToProductPreview(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('orderPopup').style.display = 'none';
+  resetPayButtonIfLoading();
+
+  document.getElementById('popupPreviewImage').src = selectedItem.image;
+  document.getElementById('popupPreviewTitle').innerText = selectedItem.title;
+  updatePrice();
+
+  const preview = document.getElementById('orderPopupPreview');
+  preview.style.display = 'flex';
+  preview.onclick = function (ev) {
+    if (ev.target === preview) {
+      closeOrderPreview();
     }
   };
 }
 
 function updatePrice() {
   const rearSeatCheckbox = document.getElementById('backSeatCheckbox');
+  if (!rearSeatCheckbox || !selectedItem || !Number.isFinite(selectedItem.price)) return;
+
   const addPrice = parseInt(rearSeatCheckbox.dataset.price, 10) || 0;
 
   totalPrice = selectedItem.price;
@@ -182,7 +245,12 @@ function updatePrice() {
     totalPrice += addPrice;
   }
 
-  document.getElementById('popupPrice').innerText = `Цена: ${totalPrice} ₽`;
+  const priceText = `Цена: ${totalPrice} ₽`;
+  const popupPriceEl = document.getElementById('popupPrice');
+  const previewPriceEl = document.getElementById('popupPreviewPrice');
+  if (popupPriceEl) popupPriceEl.innerText = priceText;
+  if (previewPriceEl) previewPriceEl.innerText = priceText;
+  updateConsentStatus();
 }
 
 function openPolicyPopup(event) {
@@ -211,6 +279,17 @@ function isValidCustomerEmail() {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
+function isValidOrderDeliveryFields() {
+  const f = document.getElementById('customerFirstName');
+  const l = document.getElementById('customerLastName');
+  const a = document.getElementById('deliveryAddress');
+  if (!f || !l || !a) return false;
+  const first = f.value.trim();
+  const last = l.value.trim();
+  const addr = a.value.trim();
+  return first.length >= 2 && last.length >= 2 && addr.length >= 5;
+}
+
 const PAY_BUTTON_LABEL = 'Оплатить';
 
 function resetPayButtonIfLoading() {
@@ -229,7 +308,7 @@ function updateConsentStatus() {
 
   if (!payButton) return;
   const checksOk = policyCheckbox && returnCheckbox ? (policyCheckbox.checked && returnCheckbox.checked) : true;
-  const isAllowed = checksOk && isValidCustomerEmail();
+  const isAllowed = checksOk && isValidCustomerEmail() && isValidOrderDeliveryFields();
 
   payButton.disabled = !isAllowed;
   payButton.classList.toggle('disabled', !isAllowed);
@@ -260,11 +339,23 @@ async function startPayment() {
     return;
   }
 
+  const firstName = (document.getElementById('customerFirstName') || {}).value.trim();
+  const lastName = (document.getElementById('customerLastName') || {}).value.trim();
+  const deliveryAddress = (document.getElementById('deliveryAddress') || {}).value.trim();
+  if (!isValidOrderDeliveryFields()) {
+    alert('Заполните имя, фамилию и адрес доставки.');
+    return;
+  }
+
   const body = JSON.stringify({
     amount_rub: amount,
     description: `${selectedItem.title} — ${amount} ₽`,
     return_url: 'https://irina-sketch.ru/',
-    customer_email: (document.getElementById('customerEmail') || {}).value.trim()
+    customer_email: (document.getElementById('customerEmail') || {}).value.trim(),
+    customer_first_name: firstName,
+    customer_last_name: lastName,
+    delivery_address: deliveryAddress,
+    rear_seat: !!(document.getElementById('backSeatCheckbox') || {}).checked
   });
 
   const endpoints = getPaymentEndpoints();
@@ -324,6 +415,7 @@ async function startPayment() {
 document.addEventListener('DOMContentLoaded', () => {
   const payBtn = document.getElementById('payButton');
   if (payBtn) payBtn.addEventListener('click', startPayment);
+  updateConsentStatus();
 });
 
 // Возврат с ЮKassa кнопкой «Назад»: страница из bfcache — текст «Создаём платёж…» оставался
@@ -338,16 +430,18 @@ document.addEventListener('visibilitychange', function () {
 
 
 
-// Закрытие попапа
+// Крестик / клик вне формы — назад к превью товара
 function closeOrder(event) {
-  document.getElementById('orderPopup').style.display = 'none';
-  resetPayButtonIfLoading();
+  backToProductPreview(event);
 }
 
-
-  // Обработчик кнопки "Назад" в браузере
+  // Обработчик кнопки "Назад" в браузере — закрыть оба попапа
   window.onpopstate = function () {
-    closeOrder();
+    const form = document.getElementById('orderPopup');
+    const preview = document.getElementById('orderPopupPreview');
+    if (form) form.style.display = 'none';
+    if (preview) preview.style.display = 'none';
+    resetPayButtonIfLoading();
   };
 
   // Для поддержки кнопки "Назад", добавляем историю в стэк

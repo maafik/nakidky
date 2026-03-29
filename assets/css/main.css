@@ -2252,10 +2252,19 @@ section,
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 999;
-  padding: 20px;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   box-sizing: border-box;
   cursor: pointer; /* Это позволяет воспринимать клик вне формы */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.order-popup-preview {
+  z-index: 999;
+}
+
+.order-popup-form {
+  z-index: 1000;
 }
 
 .order-content {
@@ -2263,11 +2272,16 @@ section,
   display: flex;
   max-width: 800px;
   width: 100%;
+  max-height: min(92vh, 900px);
   border: 2px solid #444;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   flex-direction: row;
   cursor: default; /* Это отключает клик по самой форме */
+  margin: auto;
 }
 
 
@@ -2312,7 +2326,8 @@ section,
     font-family: inherit;
   }
 
-  #payButton.whatsapp-btn:disabled {
+  #payButton.whatsapp-btn:disabled,
+  #proceedToFormBtn.whatsapp-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
   }
@@ -2330,14 +2345,32 @@ section,
   @media (max-width: 768px) {
     .order-content {
       flex-direction: column;
+      max-height: min(94vh, calc(100vh - 24px));
+      max-height: min(94vh, calc(100dvh - 24px));
     }
 
     .order-image, .order-details {
       width: 100%;
     }
 
+    .order-popup-preview .order-image {
+      max-height: min(36vh, 280px);
+      flex-shrink: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .order-popup-preview .order-image img {
+      max-height: min(36vh, 280px);
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+    }
+
     .order-details {
-      padding: 16px;
+      padding: 14px 14px 18px;
     }
 
     .order-details h3 {
@@ -2346,6 +2379,62 @@ section,
 
     .order-details p {
       font-size: 15px;
+    }
+
+    .order-preview-hint {
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    .policy-checks {
+      margin-top: 10px;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .policy-checkbox {
+      gap: 8px;
+    }
+
+    .customer-email-label {
+      margin-top: 10px;
+      font-size: 13px;
+    }
+
+    .customer-email-input {
+      padding: 9px 10px;
+      font-size: 16px;
+    }
+
+    .order-preview-actions {
+      position: sticky;
+      bottom: 0;
+      padding-top: 8px;
+      margin-top: 4px;
+      background: linear-gradient(to top, #1a1a1a 85%, rgba(26, 26, 26, 0));
+    }
+
+    .order-popup-form .order-image {
+      max-height: min(32vh, 240px);
+      flex-shrink: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .order-popup-form .order-image img {
+      max-height: min(32vh, 240px);
+      width: 100%;
+      object-fit: contain;
+    }
+
+    .order-popup-form .popup-messengers {
+      position: sticky;
+      bottom: 0;
+      padding-top: 10px;
+      margin-top: 8px;
+      background: linear-gradient(to top, #1a1a1a 88%, rgba(26, 26, 26, 0));
     }
 
     .whatsapp-btn {
@@ -2500,6 +2589,75 @@ section,
 
 .customer-email-input::placeholder {
   color: #777;
+}
+
+.order-preview-rear-seat {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.order-preview-hint {
+  color: #b0b0b0;
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0 0 16px;
+}
+
+.order-preview-actions {
+  margin-top: 4px;
+}
+
+.order-preview-btn {
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.order-back-link {
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  cursor: pointer;
+  padding: 0 0 10px;
+  margin: 0 0 6px;
+  font-size: 14px;
+  text-decoration: underline;
+  display: block;
+  text-align: left;
+  font-family: inherit;
+}
+
+.order-back-link:hover {
+  opacity: 0.9;
+}
+
+.order-fields {
+  margin-top: 14px;
+  text-align: left;
+}
+
+.order-fields-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.order-field {
+  min-width: 0;
+}
+
+.order-address-textarea {
+  min-height: 72px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+@media (max-width: 480px) {
+  .order-fields-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .messenger-note {

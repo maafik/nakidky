@@ -74,7 +74,7 @@
 
   <!-- Стартовая кнопка -->
 <a href="#orderSection">
-  <button class="button" id="startOrderBtn">Сделать заказ</button>
+  <button class="button" id="startOrderBtn" type="button">Заказать</button>
 </a>
 
    
@@ -155,23 +155,23 @@
   <!-- Передние накидки -->
   <div class="gallery-item" onclick="openOrder('assets/img/gallery-5/gallery-1.webp', 'Накидка на передние сиденья, льняная — чёрный/синий, 2 шт', 1999)">
     <img src="assets/img/gallery-5/gallery-1.webp" alt="Накидка чёрный/синий" fetchpriority="high" decoding="async">
-    <button>Заказать</button>
+    <button type="button">Заказать</button>
   </div>
   <div class="gallery-item" onclick="openOrder('assets/img/gallery-5/gallery-2.webp', 'Накидка на передние сиденья, льняная — чёрный/красный, 2 шт', 1999)">
     <img src="assets/img/gallery-5/gallery-2.webp" alt="Накидка чёрный/красный" loading="lazy" decoding="async">
-    <button>Заказать</button>
+    <button type="button">Заказать</button>
   </div>
   <div class="gallery-item" onclick="openOrder('assets/img/gallery-5/gallery-3.webp', 'Накидка на передние сиденья, льняная — чёрный, 2 шт', 1999)">
     <img src="assets/img/gallery-5/gallery-3.webp" alt="Накидка чёрный" loading="lazy" decoding="async">
-    <button>Заказать</button>
+    <button type="button">Заказать</button>
   </div>
   <div class="gallery-item" onclick="openOrder('assets/img/gallery-5/gallery-4.webp', 'Накидка на передние сиденья, льняная — серая, 2 шт', 1999)">
     <img src="assets/img/gallery-5/gallery-4.webp" alt="Накидка серая" loading="lazy" decoding="async">
-    <button>Заказать</button>
+    <button type="button">Заказать</button>
   </div>
   <div class="gallery-item" onclick="openOrder('assets/img/gallery-5/gallery-5.webp', 'Накидка на передние сиденья, льняная — бежевая, 2 шт', 1999)">
     <img src="assets/img/gallery-5/gallery-5.webp" alt="Накидка бежевая" loading="lazy" decoding="async">
-    <button>Заказать</button>
+    <button type="button">Заказать</button>
   </div>
 </div>
 
@@ -209,26 +209,23 @@
   };
 </script>
 
-<!-- Popup -->
-<div class="order-popup" id="orderPopup" onclick="closeOrder(event)">
+<!-- Попап 1: превью товара -->
+<div class="order-popup order-popup-preview" id="orderPopupPreview">
   <div class="order-content" onclick="event.stopPropagation()">
-    <div class="close-btn" onclick="closeOrder(event)">✖</div>
+    <div class="close-btn" onclick="closeOrderPreview(event)">✖</div>
     <div class="order-image">
-      <img id="popupImage" src="" alt="">
+      <img id="popupPreviewImage" src="" alt="">
     </div>
-    <div class="order-details">
-      <h3 id="popupTitle">Название товара</h3>
-      <p id="popupPrice">Цена: </p>
-
-      <!-- Чекбокс для доплаты -->
-      <label class="custom-checkbox">
-        <input type="checkbox" 
-               id="backSeatCheckbox" 
-               data-price="2000" 
+    <div class="order-details order-preview-details">
+      <h3 id="popupPreviewTitle">Название товара</h3>
+      <p id="popupPreviewPrice">Цена: </p>
+      <label class="custom-checkbox order-preview-rear-seat">
+        <input type="checkbox"
+               id="backSeatCheckbox"
+               data-price="2000"
                onclick="updatePrice()">
         <span class="checkmark"></span> Задний ряд +<span>2000</span> ₽
       </label>
-
       <div class="policy-checks">
         <label class="policy-checkbox">
           <input type="checkbox" id="policyAgree" onchange="updateConsentStatus()">
@@ -239,9 +236,42 @@
           <span>Ознакомлен с условиями возврата</span>
         </label>
       </div>
-
       <label class="customer-email-label" for="customerEmail">Email для чека (54‑ФЗ)</label>
       <input type="email" id="customerEmail" class="customer-email-input" placeholder="you@example.com" autocomplete="email" inputmode="email" oninput="updateConsentStatus()">
+      <p class="order-preview-hint">Нажмите «Оформить заказ», чтобы указать доставку и оплатить.</p>
+      <div class="order-preview-actions">
+        <button type="button" id="proceedToFormBtn" class="whatsapp-btn order-preview-btn" onclick="proceedToCheckoutForm(event)">Оформить заказ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Попап 2: доставка и оплата -->
+<div class="order-popup order-popup-form" id="orderPopup" onclick="closeOrder(event)">
+  <div class="order-content" onclick="event.stopPropagation()">
+    <div class="close-btn" onclick="closeOrder(event)">✖</div>
+    <div class="order-image">
+      <img id="popupImage" src="" alt="">
+    </div>
+    <div class="order-details">
+      <button type="button" class="order-back-link" onclick="backToProductPreview(event)">← К товару</button>
+      <h3 id="popupTitle">Название товара</h3>
+      <p id="popupPrice">Цена: </p>
+
+      <div class="order-fields">
+        <div class="order-fields-row">
+          <div class="order-field">
+            <label class="customer-email-label" for="customerFirstName">Имя</label>
+            <input type="text" id="customerFirstName" class="customer-email-input" placeholder="Иван" autocomplete="given-name" maxlength="80" oninput="updateConsentStatus()">
+          </div>
+          <div class="order-field">
+            <label class="customer-email-label" for="customerLastName">Фамилия</label>
+            <input type="text" id="customerLastName" class="customer-email-input" placeholder="Иванов" autocomplete="family-name" maxlength="80" oninput="updateConsentStatus()">
+          </div>
+        </div>
+        <label class="customer-email-label" for="deliveryAddress">Адрес доставки</label>
+        <textarea id="deliveryAddress" class="customer-email-input order-address-textarea" placeholder="Город, улица, дом, квартира, индекс" rows="3" maxlength="500" oninput="updateConsentStatus()"></textarea>
+      </div>
 
       <p class="messenger-note">Оплата банковской картой через ЮKassa.</p>
       <div class="popup-messengers">
