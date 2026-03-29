@@ -9,6 +9,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   exit;
 }
 
+if (!function_exists('curl_init')) {
+  http_response_code(500);
+  echo json_encode(['error' => 'На хостинге не включён модуль PHP curl — включите его в панели или попросите поддержку.'], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
 require_once __DIR__ . '/yookassa-config.php';
 
 $raw = file_get_contents('php://input');
@@ -47,7 +53,18 @@ if (YOOKASSA_SECRET_KEY === '') {
 
 $value = number_format($amountRub, 2, '.', '');
 
-$idempotencyKey = bin2hex(random_bytes(16));
+// ЮKassa рекомендует UUID для Idempotency-Key
+$idempotencyKey = sprintf(
+  '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+  random_int(0, 0xffff),
+  random_int(0, 0xffff),
+  random_int(0, 0xffff),
+  random_int(0, 0x0fff) | 0x4000,
+  random_int(0, 0x3fff) | 0x8000,
+  random_int(0, 0xffff),
+  random_int(0, 0xffff),
+  random_int(0, 0xffff)
+);
 
 $payload = [
   'amount' => [
@@ -94,10 +111,16 @@ if (!is_array($data)) {
 }
 
 $confirmUrl = $data['confirmation']['confirmation_url'] ?? null;
-if ($code !== 200 || !is_string($confirmUrl) || $confirmUrl === '') {
-  $msg = isset($data['description']) ? (string) $data['description'] : 'Не удалось создать платёж';
+$ok = ($code === 200 || $code === 201) && is_string($confirmUrl) && $confirmUrl !== '';
+if (!$ok) {
+  $msg = 'Не удалось создать платёж';
+  if (isset($data['description']) && is_string($data['description']) && $data['description'] !== '') {
+    $msg = $data['description'];
+  } elseif (isset($data['code']) && is_string($data['code'])) {
+    $msg = $data['code'];
+  }
   http_response_code(502);
-  echo json_encode(['error' => $msg], JSON_UNESCAPED_UNICODE);
+  echo json_encode(['error' => $msg, 'http' => $code], JSON_UNESCAPED_UNICODE);
   exit;
 }
 

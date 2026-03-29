@@ -218,7 +218,10 @@ async function startPayment() {
   const btn = document.getElementById('payButton');
   if (!btn || btn.disabled) return;
 
-  const paymentUrl = new URL('forms/create-payment.php', window.location.href).href;
+  const origin = window.location.origin;
+  const path = window.location.pathname.replace(/\/[^/]+$/, '') || '';
+  const base = path === '' ? `${origin}/` : `${origin}${path.endsWith('/') ? path : path + '/'}`;
+  const paymentUrl = new URL('forms/create-payment.php', base).href;
   const label = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Создаём платёж…';
@@ -226,16 +229,27 @@ async function startPayment() {
   try {
     const res = await fetch(paymentUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({
         amount_rub: totalPrice,
         description: `${selectedItem.title} — ${totalPrice} ₽`,
         return_url: 'https://irina-sketch.ru/'
       })
     });
-    const data = await res.json().catch(() => ({}));
+    const text = await res.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error(
+        text && text.indexOf('<') === 0
+          ? 'Сервер вернул HTML вместо ответа оплаты — проверьте, что PHP включён и файл forms/create-payment.php доступен.'
+          : (text.slice(0, 280) || 'Некорректный ответ сервера')
+      );
+    }
     if (!res.ok || !data.confirmation_url) {
-      throw new Error(data.error || 'Не удалось перейти к оплате');
+      const hint = data.error || (data.http ? `HTTP ${data.http}` : '');
+      throw new Error(hint || `Не удалось перейти к оплате (код ${res.status})`);
     }
     window.location.href = data.confirmation_url;
   } catch (e) {
