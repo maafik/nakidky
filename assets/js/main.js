@@ -243,9 +243,15 @@ async function startPayment() {
   const btn = document.getElementById('payButton');
   if (!btn || btn.disabled) return;
 
+  const amount = Number(totalPrice);
+  if (!Number.isFinite(amount) || amount < 1) {
+    alert('Некорректная сумма заказа. Закройте окно и откройте товар заново.');
+    return;
+  }
+
   const body = JSON.stringify({
-    amount_rub: totalPrice,
-    description: `${selectedItem.title} — ${totalPrice} ₽`,
+    amount_rub: amount,
+    description: `${selectedItem.title} — ${amount} ₽`,
     return_url: 'https://irina-sketch.ru/',
     customer_email: (document.getElementById('customerEmail') || {}).value.trim()
   });
@@ -261,6 +267,8 @@ async function startPayment() {
     for (const paymentUrl of endpoints) {
       const res = await fetch(paymentUrl, {
         method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: body
       });

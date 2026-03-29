@@ -6,6 +6,45 @@
  */
 const { randomUUID } = require('crypto');
 
+/** На Vercel Node-функциях req.body часто пустой — читаем поток вручную */
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    if (req.body != null) {
+      if (typeof req.body === 'string' && req.body.length) {
+        try {
+          return resolve(JSON.parse(req.body));
+        } catch {
+          return resolve({});
+        }
+      }
+      if (Buffer.isBuffer(req.body) && req.body.length) {
+        try {
+          return resolve(JSON.parse(req.body.toString('utf8')));
+        } catch {
+          return resolve({});
+        }
+      }
+      if (typeof req.body === 'object' && !Buffer.isBuffer(req.body) && Object.keys(req.body).length > 0) {
+        return resolve(req.body);
+      }
+    }
+    let raw = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => {
+      raw += chunk;
+    });
+    req.on('end', () => {
+      if (!raw.trim()) return resolve({});
+      try {
+        resolve(JSON.parse(raw));
+      } catch {
+        resolve({});
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
 function sendJson(res, status, obj) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -15,7 +54,10 @@ function sendJson(res, status, obj) {
 function cors(res, req) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Accept, X-Requested-With'
+  );
   if (req.method === 'OPTIONS') {
     res.statusCode = 204;
     res.end();
@@ -34,20 +76,18 @@ module.exports = async function handler(req, res) {
   const shopId = process.env.YOOKASSA_SHOP_ID || '1235468';
   const secret = process.env.YOOKASSA_SECRET_KEY || '';
   if (!secret) {
-    return sendJson(res, 500, { error: 'YOOKASSA_SECRET_KEY не задан в Vercel' });
+    return sendJson(res, 500, { error: 'YOOKASSA_SECRET_KEY не задан в Vercel (Environment Variables → Production)' });
   }
 
-  let input = req.body;
-  if (typeof input === 'string') {
-    try {
-      input = JSON.parse(input);
-    } catch {
-      input = {};
-    }
+  let input;
+  try {
+    input = await readJsonBody(req);
+  } catch (err) {
+    return sendJson(res, 400, { error: 'Не удалось прочитать тело запроса' });
   }
   if (!input || typeof input !== 'object') input = {};
 
-  const amountRub = parseFloat(input.amount_rub);
+  const amountRub = parseFloat(String(input.amount_rub ?? ''));
   let description = String(input.description || '').trim() || 'Заказ накидок';
   description = description.slice(0, 128);
 
@@ -62,8 +102,8 @@ module.exports = async function handler(req, res) {
     return sendJson(res, 400, { error: 'Укажите корректный email — на него уйдёт чек (54‑ФЗ).' });
   }
 
-  if (amountRub < 1 || amountRub > 500000) {
-    return sendJson(res, 400, { error: 'Некорректная сумма' });
+  if (!Number.isFinite(amountRub) || amountRub < 1 || amountRub > 500000) {
+    return sendJson(res, 400, { error: 'Некорректная сумма — обновите страницу и выберите товар снова' });
   }
 
   const value = amountRub.toFixed(2);
