@@ -39,6 +39,13 @@ if ($returnUrl === '' || !preg_match('#^https://(www\.)?irina-sketch\.ru(/|$)#',
   $returnUrl = 'https://irina-sketch.ru/';
 }
 
+$customerEmail = isset($input['customer_email']) ? trim((string) $input['customer_email']) : '';
+if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+  http_response_code(400);
+  echo json_encode(['error' => 'Укажите корректный email — на него уйдёт чек (54‑ФЗ).'], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
 if ($amountRub < 1 || $amountRub > 500000) {
   http_response_code(400);
   echo json_encode(['error' => 'Некорректная сумма'], JSON_UNESCAPED_UNICODE);
@@ -66,6 +73,11 @@ $idempotencyKey = sprintf(
   random_int(0, 0xffff)
 );
 
+$vatCode = 1;
+if (defined('YOOKASSA_VAT_CODE')) {
+  $vatCode = (int) constant('YOOKASSA_VAT_CODE');
+}
+
 $payload = [
   'amount' => [
     'value' => $value,
@@ -77,6 +89,24 @@ $payload = [
   ],
   'capture' => true,
   'description' => $description,
+  'receipt' => [
+    'customer' => [
+      'email' => $customerEmail,
+    ],
+    'items' => [
+      [
+        'description' => $description,
+        'quantity' => '1.00',
+        'amount' => [
+          'value' => $value,
+          'currency' => 'RUB',
+        ],
+        'vat_code' => $vatCode,
+        'payment_mode' => 'full_payment',
+        'payment_subject' => 'commodity',
+      ],
+    ],
+  ],
 ];
 
 $ch = curl_init('https://api.yookassa.ru/v3/payments');
@@ -84,7 +114,8 @@ curl_setopt_array($ch, [
   CURLOPT_POST => true,
   CURLOPT_HTTPHEADER => [
     'Content-Type: application/json',
-    'Idempotency-Key: ' . $idempotencyKey,
+    // В API ЮKassa именно Idempotence-Key (не Idempotency)
+    'Idempotence-Key: ' . $idempotencyKey,
     'Authorization: Basic ' . base64_encode(YOOKASSA_SHOP_ID . ':' . YOOKASSA_SECRET_KEY),
   ],
   CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
@@ -118,6 +149,9 @@ if (!$ok) {
     $msg = $data['description'];
   } elseif (isset($data['code']) && is_string($data['code'])) {
     $msg = $data['code'];
+  }
+  if (isset($data['parameter']) && is_string($data['parameter']) && $data['parameter'] !== '') {
+    $msg .= ' (' . $data['parameter'] . ')';
   }
   http_response_code(502);
   echo json_encode(['error' => $msg, 'http' => $code], JSON_UNESCAPED_UNICODE);

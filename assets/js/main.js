@@ -156,6 +156,8 @@ function openOrder(image, title, price) {
   const returnCheckbox = document.getElementById('returnAgree');
   if (policyCheckbox) policyCheckbox.checked = false;
   if (returnCheckbox) returnCheckbox.checked = false;
+  const emailInput = document.getElementById('customerEmail');
+  if (emailInput) emailInput.value = '';
 
   // ставим базовую цену для товара
   totalPrice = selectedItem.price;
@@ -201,13 +203,22 @@ function closePolicyPopup(event) {
   }
 }
 
+function isValidCustomerEmail() {
+  const el = document.getElementById('customerEmail');
+  if (!el) return false;
+  const v = el.value.trim();
+  if (v === '') return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
 function updateConsentStatus() {
   const policyCheckbox = document.getElementById('policyAgree');
   const returnCheckbox = document.getElementById('returnAgree');
   const payButton = document.getElementById('payButton');
 
   if (!payButton) return;
-  const isAllowed = policyCheckbox && returnCheckbox ? (policyCheckbox.checked && returnCheckbox.checked) : true;
+  const checksOk = policyCheckbox && returnCheckbox ? (policyCheckbox.checked && returnCheckbox.checked) : true;
+  const isAllowed = checksOk && isValidCustomerEmail();
 
   payButton.disabled = !isAllowed;
   payButton.classList.toggle('disabled', !isAllowed);
@@ -233,7 +244,8 @@ async function startPayment() {
       body: JSON.stringify({
         amount_rub: totalPrice,
         description: `${selectedItem.title} — ${totalPrice} ₽`,
-        return_url: 'https://irina-sketch.ru/'
+        return_url: 'https://irina-sketch.ru/',
+        customer_email: (document.getElementById('customerEmail') || {}).value.trim()
       })
     });
     const text = await res.text();
