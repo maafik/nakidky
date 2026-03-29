@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/create-payment.js": {
+      "runtime": "nodejs20.x"
+    }
+  }
+}

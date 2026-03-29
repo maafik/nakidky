@@ -225,11 +225,24 @@ function updateConsentStatus() {
   payButton.setAttribute('aria-disabled', (!isAllowed).toString());
 }
 
+function getPaymentEndpoints() {
+  const custom =
+    typeof window.PAYMENT_API_BASE === 'string' ? window.PAYMENT_API_BASE.trim().replace(/\/$/, '') : '';
+  if (custom) {
+    return [new URL('/api/create-payment', custom + '/').href];
+  }
+  const origin = window.location.origin;
+  return [
+    new URL('/api/create-payment', origin + '/').href,
+    new URL('/create-payment.php', origin + '/').href,
+    new URL('/forms/create-payment.php', origin + '/').href
+  ];
+}
+
 async function startPayment() {
   const btn = document.getElementById('payButton');
   if (!btn || btn.disabled) return;
 
-  const origin = window.location.origin;
   const body = JSON.stringify({
     amount_rub: totalPrice,
     description: `${selectedItem.title} — ${totalPrice} ₽`,
@@ -237,10 +250,7 @@ async function startPayment() {
     customer_email: (document.getElementById('customerEmail') || {}).value.trim()
   });
 
-  const endpoints = [
-    new URL('/create-payment.php', origin).href,
-    new URL('/forms/create-payment.php', origin).href
-  ];
+  const endpoints = getPaymentEndpoints();
 
   const label = btn.textContent;
   btn.disabled = true;
@@ -279,10 +289,11 @@ async function startPayment() {
     }
 
     throw new Error(
-      'Сервер отдал страницу HTML вместо JSON. Обычно это значит: на хостинге нет PHP, ' +
-        'файлы create-payment.php не залиты в корень сайта, или правила «всё на index.html» перехватывают запрос. ' +
-        (lastHtmlUrl ? 'Пробовали: ' + lastHtmlUrl + '. ' : '') +
-        'Нужен хостинг с PHP и доступность /create-payment.php по HTTPS.'
+      'Сайт отдаёт HTML вместо API оплаты (PHP не выполняется или всё уходит в index.html). ' +
+        'Варианты: 1) включить PHP на хостинге и залить create-payment.php; ' +
+        '2) задеплоить проект на Vercel (файл api/create-payment.js), добавить в Vercel переменные YOOKASSA_SHOP_ID и YOOKASSA_SECRET_KEY, ' +
+        'в index.html задать window.PAYMENT_API_BASE = "https://ваш-проект.vercel.app". ' +
+        (lastHtmlUrl ? 'Последний запрос: ' + lastHtmlUrl : '')
     );
   } catch (e) {
     alert(e.message || 'Ошибка оплаты');
