@@ -2307,6 +2307,14 @@ section,
     font-weight: bold;
     font-size: 16px;
     border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  #payButton.whatsapp-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   .close-btn {
@@ -2483,7 +2491,8 @@ section,
   margin-top: 12px;
 }
 
-.popup-messengers a {
+.popup-messengers a,
+.popup-messengers button {
   flex: 1;
   text-align: center;
 }

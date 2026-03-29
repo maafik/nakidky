@@ -32,7 +32,9 @@
     mobileNavToggleBtn.classList.toggle('bi-list');
     mobileNavToggleBtn.classList.toggle('bi-x');
   }
-  mobileNavToggleBtn.addEventListener('click', mobileNavToogle);
+  if (mobileNavToggleBtn) {
+    mobileNavToggleBtn.addEventListener('click', mobileNavToogle);
+  }
 
   /**
    * Hide mobile nav on same-page/hash links
@@ -59,17 +61,13 @@
   });
 
   /**
-   * Preloader
+   * Preloader (короткая задержка — быстрее показ контента)
    */
   const preloader = document.querySelector('#preloader');
   if (preloader) {
     window.addEventListener('load', () => {
-      setTimeout(() => {
-        preloader.classList.add('loaded');
-      }, 1000);
-      setTimeout(() => {
-        preloader.remove();
-      }, 2000);
+      preloader.classList.add('loaded');
+      setTimeout(() => preloader.remove(), 320);
     });
   }
 
@@ -83,16 +81,17 @@
       window.scrollY > 100 ? scrollTop.classList.add('active') : scrollTop.classList.remove('active');
     }
   }
-  scrollTop.addEventListener('click', (e) => {
-    e.preventDefault();
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
+  if (scrollTop) {
+    scrollTop.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
     });
-  });
-
-  window.addEventListener('load', toggleScrollTop);
-  document.addEventListener('scroll', toggleScrollTop);
+    window.addEventListener('load', toggleScrollTop);
+    document.addEventListener('scroll', toggleScrollTop);
+  }
 
   /**
    * Animation on scroll function and init
@@ -108,22 +107,22 @@
   window.addEventListener('load', aosInit);
 
   /**
-   * Initiate glightbox
+   * Initiate glightbox (только если есть элементы — меньше работы на главной)
    */
-  const glightbox = GLightbox({
-    selector: '.glightbox'
-  });
+  if (typeof GLightbox !== 'undefined' && document.querySelector('.glightbox')) {
+    GLightbox({ selector: '.glightbox' });
+  }
 
   /**
    * Init swiper sliders
    */
   function initSwiper() {
     document.querySelectorAll(".init-swiper").forEach(function(swiperElement) {
-      let config = JSON.parse(
-        swiperElement.querySelector(".swiper-config").innerHTML.trim()
-      );
+      const cfgEl = swiperElement.querySelector(".swiper-config");
+      if (!cfgEl || typeof Swiper === 'undefined') return;
+      let config = JSON.parse(cfgEl.innerHTML.trim());
 
-      if (swiperElement.classList.contains("swiper-tab")) {
+      if (swiperElement.classList.contains("swiper-tab") && typeof initSwiperWithCustomPagination === 'function') {
         initSwiperWithCustomPagination(swiperElement, config);
       } else {
         new Swiper(swiperElement, config);
@@ -135,38 +134,7 @@
 
 })();
 
- 
-
-// Функция для открытия попапа с товаром
-function openOrder(image, title, price) {
-  selectedItem = { image, title, price };
-
-  document.getElementById('orderPopup').style.display = 'flex';
-  document.getElementById('popupImage').src = image;
-  document.getElementById('popupTitle').innerText = title;
-
-  // Устанавливаем начальную цену товара
-  totalPrice = price; // Сбрасываем цену товара, передаем новую цену
-
-  // Обновляем цену в попапе
-  updatePrice();
-
-  // Обновляем ссылку на WhatsApp с параметрами
-  const phoneNumber = '79517623467';  // Номер телефона
-  const message = encodeURIComponent(`Хочу заказать ${title} за ${totalPrice} ₽`);
-  document.getElementById('whatsappLink').href = `https://wa.me/${phoneNumber}?text=${message}`;
-
-  // Чтобы форма не закрылась, если кликнуть по ней
-  document.getElementById('orderPopup').addEventListener('click', closeOrder);
-  document.getElementById('orderPopup').addEventListener('click', function (event) {
-    if (event.target === document.getElementById('orderPopup')) {
-      closeOrder();
-    }
-  });
-}
-
-// Функция для обновления цены при изменении состояния чекбокса
-let selectedItem = {}; 
+let selectedItem = {};
 let totalPrice = 0;
 
 function openOrder(image, title, price) {
@@ -192,7 +160,6 @@ function openOrder(image, title, price) {
   // ставим базовую цену для товара
   totalPrice = selectedItem.price;
 
-  // обновляем цену и WhatsApp ссылку
   updatePrice();
   updateConsentStatus();
 
@@ -214,10 +181,6 @@ function updatePrice() {
   }
 
   document.getElementById('popupPrice').innerText = `Цена: ${totalPrice} ₽`;
-
-  const message = encodeURIComponent(`Хочу заказать ${selectedItem.title} за ${totalPrice} ₽`);
-  document.getElementById('whatsappLink').href = `https://wa.me/79517623467?text=${message}`;
-  document.getElementById('telegramLink').href = `https://t.me/IrisArts1?text=${message}`;
 }
 
 function openPolicyPopup(event) {
@@ -241,18 +204,51 @@ function closePolicyPopup(event) {
 function updateConsentStatus() {
   const policyCheckbox = document.getElementById('policyAgree');
   const returnCheckbox = document.getElementById('returnAgree');
-  const messengerButtons = document.querySelectorAll('.popup-messengers a');
+  const payButton = document.getElementById('payButton');
 
-  if (!messengerButtons.length) return;
+  if (!payButton) return;
   const isAllowed = policyCheckbox && returnCheckbox ? (policyCheckbox.checked && returnCheckbox.checked) : true;
 
-  messengerButtons.forEach((button) => {
-    if (!button) return;
-    button.classList.toggle('disabled', !isAllowed);
-    button.setAttribute('aria-disabled', (!isAllowed).toString());
-    button.tabIndex = isAllowed ? 0 : -1;
-  });
+  payButton.disabled = !isAllowed;
+  payButton.classList.toggle('disabled', !isAllowed);
+  payButton.setAttribute('aria-disabled', (!isAllowed).toString());
 }
+
+async function startPayment() {
+  const btn = document.getElementById('payButton');
+  if (!btn || btn.disabled) return;
+
+  const paymentUrl = new URL('forms/create-payment.php', window.location.href).href;
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Создаём платёж…';
+
+  try {
+    const res = await fetch(paymentUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount_rub: totalPrice,
+        description: `${selectedItem.title} — ${totalPrice} ₽`,
+        return_url: 'https://irina-sketch.ru/'
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.confirmation_url) {
+      throw new Error(data.error || 'Не удалось перейти к оплате');
+    }
+    window.location.href = data.confirmation_url;
+  } catch (e) {
+    alert(e.message || 'Ошибка оплаты');
+    btn.textContent = label;
+    updateConsentStatus();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const payBtn = document.getElementById('payButton');
+  if (payBtn) payBtn.addEventListener('click', startPayment);
+});
 
 
 
@@ -280,48 +276,49 @@ function closeOrder(event) {
     const backItems = document.getElementById('backItems');
     const frontBtn = document.getElementById('frontBtn');
     const backBtn = document.getElementById('backBtn');
+    if (!frontItems || !backItems) return;
 
     if (type === 'front') {
       frontItems.style.display = 'flex';
       backItems.style.display = 'none';
-      frontBtn.classList.add('active');
-      backBtn.classList.remove('active');
+      if (frontBtn) frontBtn.classList.add('active');
+      if (backBtn) backBtn.classList.remove('active');
     } else {
       backItems.style.display = 'flex';
       frontItems.style.display = 'none';
-      backBtn.classList.add('active');
-      frontBtn.classList.remove('active');
+      if (backBtn) backBtn.classList.add('active');
+      if (frontBtn) frontBtn.classList.remove('active');
     }
   }
   const reviewsWrapper = document.querySelector('.reviews-wrapper');
 let isMouseDown = false;
 let startX, scrollLeft;
 
-reviewsWrapper.addEventListener('mousedown', (e) => {
+if (reviewsWrapper) reviewsWrapper.addEventListener('mousedown', (e) => {
   isMouseDown = true;
   startX = e.pageX - reviewsWrapper.offsetLeft;
   scrollLeft = reviewsWrapper.scrollLeft;
   reviewsWrapper.style.cursor = 'grabbing';
 });
 
-reviewsWrapper.addEventListener('mouseleave', () => {
+if (reviewsWrapper) reviewsWrapper.addEventListener('mouseleave', () => {
   isMouseDown = false;
   reviewsWrapper.style.cursor = 'grab';
 });
 
-reviewsWrapper.addEventListener('mouseup', () => {
+if (reviewsWrapper) reviewsWrapper.addEventListener('mouseup', () => {
   isMouseDown = false;
   reviewsWrapper.style.cursor = 'grab';
 });
 
-reviewsWrapper.addEventListener('mousemove', (e) => {
+if (reviewsWrapper) reviewsWrapper.addEventListener('mousemove', (e) => {
   if (!isMouseDown) return;
   const x = e.pageX - reviewsWrapper.offsetLeft;
   const walk = (x - startX) * 3; // Скорость прокрутки
   reviewsWrapper.scrollLeft = scrollLeft - walk;
 });
 
-reviewsWrapper.addEventListener('wheel', (e) => {
+if (reviewsWrapper) reviewsWrapper.addEventListener('wheel', (e) => {
   e.preventDefault();
   reviewsWrapper.scrollLeft += e.deltaY; // Прокрутка мышью
 });
