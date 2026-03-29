@@ -230,40 +230,60 @@ async function startPayment() {
   if (!btn || btn.disabled) return;
 
   const origin = window.location.origin;
-  const path = window.location.pathname.replace(/\/[^/]+$/, '') || '';
-  const base = path === '' ? `${origin}/` : `${origin}${path.endsWith('/') ? path : path + '/'}`;
-  const paymentUrl = new URL('forms/create-payment.php', base).href;
+  const body = JSON.stringify({
+    amount_rub: totalPrice,
+    description: `${selectedItem.title} — ${totalPrice} ₽`,
+    return_url: 'https://irina-sketch.ru/',
+    customer_email: (document.getElementById('customerEmail') || {}).value.trim()
+  });
+
+  const endpoints = [
+    new URL('/create-payment.php', origin).href,
+    new URL('/forms/create-payment.php', origin).href
+  ];
+
   const label = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Создаём платёж…';
 
   try {
-    const res = await fetch(paymentUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({
-        amount_rub: totalPrice,
-        description: `${selectedItem.title} — ${totalPrice} ₽`,
-        return_url: 'https://irina-sketch.ru/',
-        customer_email: (document.getElementById('customerEmail') || {}).value.trim()
-      })
-    });
-    const text = await res.text();
-    let data = {};
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      throw new Error(
-        text && text.indexOf('<') === 0
-          ? 'Сервер вернул HTML вместо ответа оплаты — проверьте, что PHP включён и файл forms/create-payment.php доступен.'
-          : (text.slice(0, 280) || 'Некорректный ответ сервера')
-      );
-    }
-    if (!res.ok || !data.confirmation_url) {
+    let lastHtmlUrl = '';
+    for (const paymentUrl of endpoints) {
+      const res = await fetch(paymentUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: body
+      });
+      const text = await res.text();
+      const trimmed = text ? text.trim() : '';
+
+      if (trimmed.startsWith('<')) {
+        lastHtmlUrl = paymentUrl;
+        continue;
+      }
+
+      let data = {};
+      try {
+        data = trimmed ? JSON.parse(trimmed) : {};
+      } catch {
+        throw new Error(trimmed.slice(0, 280) || 'Некорректный ответ сервера');
+      }
+
+      if (res.ok && data.confirmation_url) {
+        window.location.href = data.confirmation_url;
+        return;
+      }
+
       const hint = data.error || (data.http ? `HTTP ${data.http}` : '');
       throw new Error(hint || `Не удалось перейти к оплате (код ${res.status})`);
     }
-    window.location.href = data.confirmation_url;
+
+    throw new Error(
+      'Сервер отдал страницу HTML вместо JSON. Обычно это значит: на хостинге нет PHP, ' +
+        'файлы create-payment.php не залиты в корень сайта, или правила «всё на index.html» перехватывают запрос. ' +
+        (lastHtmlUrl ? 'Пробовали: ' + lastHtmlUrl + '. ' : '') +
+        'Нужен хостинг с PHP и доступность /create-payment.php по HTTPS.'
+    );
   } catch (e) {
     alert(e.message || 'Ошибка оплаты');
     btn.textContent = label;

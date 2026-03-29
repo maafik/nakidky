@@ -1,0 +1,7 @@
+# Apache: не подменять ответ на реальные PHP-файлы оплаты (иначе приходит HTML главной).
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^create-payment\.php$ - [L]
+  RewriteRule ^forms/create-payment\.php$ - [L]
+</IfModule>
