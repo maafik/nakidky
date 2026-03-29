@@ -211,6 +211,17 @@ function isValidCustomerEmail() {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
+const PAY_BUTTON_LABEL = 'Оплатить';
+
+function resetPayButtonIfLoading() {
+  const btn = document.getElementById('payButton');
+  if (!btn) return;
+  if (btn.textContent === 'Создаём платёж…') {
+    btn.textContent = PAY_BUTTON_LABEL;
+    updateConsentStatus();
+  }
+}
+
 function updateConsentStatus() {
   const policyCheckbox = document.getElementById('policyAgree');
   const returnCheckbox = document.getElementById('returnAgree');
@@ -258,7 +269,7 @@ async function startPayment() {
 
   const endpoints = getPaymentEndpoints();
 
-  const label = btn.textContent;
+  const label = PAY_BUTTON_LABEL;
   btn.disabled = true;
   btn.textContent = 'Создаём платёж…';
 
@@ -315,11 +326,22 @@ document.addEventListener('DOMContentLoaded', () => {
   if (payBtn) payBtn.addEventListener('click', startPayment);
 });
 
+// Возврат с ЮKassa кнопкой «Назад»: страница из bfcache — текст «Создаём платёж…» оставался
+window.addEventListener('pageshow', function () {
+  resetPayButtonIfLoading();
+});
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') {
+    resetPayButtonIfLoading();
+  }
+});
+
 
 
 // Закрытие попапа
 function closeOrder(event) {
   document.getElementById('orderPopup').style.display = 'none';
+  resetPayButtonIfLoading();
 }
 
 
