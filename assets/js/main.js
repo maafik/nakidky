@@ -350,7 +350,7 @@ async function startPayment() {
   const body = JSON.stringify({
     amount_rub: amount,
     description: `${selectedItem.title} — ${amount} ₽`,
-    return_url: 'https://irina-sketch.ru/',
+    return_url: window.location.origin + '/',
     customer_email: (document.getElementById('customerEmail') || {}).value.trim(),
     customer_first_name: firstName,
     customer_last_name: lastName,
