@@ -54,6 +54,25 @@ function sendJson(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
+function normalizePhone(raw) {
+  let digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('8')) digits = '7' + digits.slice(1);
+  if (digits.length === 10 && digits.startsWith('9')) digits = '7' + digits;
+  return digits;
+}
+
+function isValidRussianPhone(phone) {
+  const digits = normalizePhone(phone);
+  return digits.length === 11 && /^7[3-9]\d{9}$/.test(digits);
+}
+
+function addressHasApartment(addr) {
+  const value = String(addr || '').trim();
+  if (value.length < 8) return false;
+  return /(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?|apt\.?)\s*[0-9]+[a-zа-я]?/iu.test(value)
+    || /(?:^|[,\s])к\s*[0-9]+/iu.test(value);
+}
+
 /** Уведомление в Telegram (токен и chat_id только в Vercel → Environment Variables) */
 async function notifyTelegramOrder(fields) {
   const token = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -65,7 +84,7 @@ async function notifyTelegramOrder(fields) {
     `Товар: ${fields.description}`,
     `Сумма: ${fields.amountRub} ₽`,
     `Имя: ${fields.firstName}`,
-    `Фамилия: ${fields.lastName}`,
+    `Телефон: ${fields.phone}`,
     `Email: ${fields.email}`,
     `Адрес: ${fields.address}`,
     `Задний ряд (+2000 ₽): ${fields.rearSeat ? 'да' : 'нет'}`,
@@ -141,11 +160,14 @@ module.exports = async function handler(req, res) {
   }
 
   const firstName = String(input.customer_first_name || '').trim();
-  const lastName = String(input.customer_last_name || '').trim();
+  const customerPhone = String(input.customer_phone || input.customer_last_name || '').trim();
   const deliveryAddress = String(input.delivery_address || '').trim();
   const rearSeat = Boolean(input.rear_seat);
-  if (firstName.length < 2 || lastName.length < 2 || deliveryAddress.length < 5) {
-    return sendJson(res, 400, { error: 'Укажите имя, фамилию и адрес доставки' });
+  if (firstName.length < 2 || !isValidRussianPhone(customerPhone)) {
+    return sendJson(res, 400, { error: 'Укажите имя и корректный номер телефона' });
+  }
+  if (!addressHasApartment(deliveryAddress)) {
+    return sendJson(res, 400, { error: 'Укажите полный адрес доставки с номером квартиры' });
   }
 
   if (!Number.isFinite(amountRub) || amountRub < 1 || amountRub > 500000) {
@@ -162,7 +184,7 @@ module.exports = async function handler(req, res) {
     description,
     metadata: {
       customer_first_name: firstName.slice(0, 200),
-      customer_last_name: lastName.slice(0, 200),
+      customer_phone: customerPhone.slice(0, 50),
       delivery_address: deliveryAddress.slice(0, 500),
       rear_seat: rearSeat ? 'yes' : 'no',
     },
@@ -223,7 +245,7 @@ module.exports = async function handler(req, res) {
     description,
     amountRub: Math.round(amountRub),
     firstName,
-    lastName,
+    phone: customerPhone,
     email: customerEmail,
     address: deliveryAddress,
     rearSeat,

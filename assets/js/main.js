@@ -199,12 +199,13 @@ function openOrderForm() {
   document.getElementById('popupTitle').innerText = selectedItem.title;
 
   const fn = document.getElementById('customerFirstName');
-  const ln = document.getElementById('customerLastName');
+  const ln = document.getElementById('customerPhone');
   if (fn) fn.value = '';
   if (ln) ln.value = '';
   const addr = document.getElementById('deliveryAddress');
   if (addr) addr.value = '';
   hideAddressSuggestions();
+  updateAddressHint();
 
   updatePrice();
   updateConsentStatus();
@@ -280,15 +281,58 @@ function isValidCustomerEmail() {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
+function normalizePhone(raw) {
+  let digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('8')) {
+    digits = '7' + digits.slice(1);
+  }
+  if (digits.length === 10 && digits.startsWith('9')) {
+    digits = '7' + digits;
+  }
+  return digits;
+}
+
+function isValidCustomerPhone() {
+  const el = document.getElementById('customerPhone');
+  if (!el) return false;
+  const digits = normalizePhone(el.value.trim());
+  return digits.length === 11 && /^7[3-9]\d{9}$/.test(digits);
+}
+
+function addressHasApartment(addr) {
+  const value = String(addr || '').trim();
+  if (value.length < 8) return false;
+  return /(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?|apt\.?)\s*[0-9]+[a-zа-я]?/iu.test(value)
+    || /(?:^|[,\s])к\s*[0-9]+/iu.test(value);
+}
+
 function isValidOrderDeliveryFields() {
   const f = document.getElementById('customerFirstName');
-  const l = document.getElementById('customerLastName');
+  const p = document.getElementById('customerPhone');
   const a = document.getElementById('deliveryAddress');
-  if (!f || !l || !a) return false;
+  if (!f || !p || !a) return false;
   const first = f.value.trim();
-  const last = l.value.trim();
   const addr = a.value.trim();
-  return first.length >= 2 && last.length >= 2 && addr.length >= 5;
+  return first.length >= 2 && isValidCustomerPhone() && addressHasApartment(addr);
+}
+
+function updateAddressHint() {
+  const hint = document.getElementById('addressHint');
+  const addrEl = document.getElementById('deliveryAddress');
+  if (!hint || !addrEl) return;
+  const addr = addrEl.value.trim();
+  if (!addr) {
+    hint.textContent = 'Укажите полный адрес с номером квартиры';
+    hint.classList.remove('address-hint--ok');
+    return;
+  }
+  if (addressHasApartment(addr)) {
+    hint.textContent = 'Адрес указан полностью';
+    hint.classList.add('address-hint--ok');
+  } else {
+    hint.textContent = 'Добавьте номер квартиры (например: кв 12)';
+    hint.classList.remove('address-hint--ok');
+  }
 }
 
 const PAY_BUTTON_LABEL = 'Оплатить';
@@ -335,6 +379,7 @@ function selectAddressSuggestion(item) {
   if (!input) return;
   input.value = item.value || '';
   hideAddressSuggestions();
+  updateAddressHint();
   updateConsentStatus();
 }
 
@@ -357,6 +402,13 @@ function renderAddressSuggestions(items) {
     title.className = 'address-suggestion-title';
     title.textContent = item.value;
     li.appendChild(title);
+
+    if (item.has_flat === false) {
+      const meta = document.createElement('span');
+      meta.className = 'address-suggestion-meta';
+      meta.textContent = 'Добавьте квартиру в запрос';
+      li.appendChild(meta);
+    }
 
     li.addEventListener('mousedown', (event) => {
       event.preventDefault();
@@ -411,6 +463,7 @@ async function fetchAddressSuggestions(query) {
 }
 
 function onAddressInput() {
+  updateAddressHint();
   updateConsentStatus();
 
   const input = document.getElementById('deliveryAddress');
@@ -515,10 +568,16 @@ async function startPayment() {
   }
 
   const firstName = (document.getElementById('customerFirstName') || {}).value.trim();
-  const lastName = (document.getElementById('customerLastName') || {}).value.trim();
+  const customerPhone = (document.getElementById('customerPhone') || {}).value.trim();
   const deliveryAddress = (document.getElementById('deliveryAddress') || {}).value.trim();
   if (!isValidOrderDeliveryFields()) {
-    alert('Заполните имя, фамилию и адрес доставки.');
+    if (!addressHasApartment(deliveryAddress)) {
+      alert('Укажите полный адрес доставки с номером квартиры.');
+    } else if (!isValidCustomerPhone()) {
+      alert('Укажите корректный номер телефона.');
+    } else {
+      alert('Заполните имя, телефон и адрес доставки.');
+    }
     return;
   }
 
@@ -528,7 +587,7 @@ async function startPayment() {
     return_url: window.location.origin + '/',
     customer_email: (document.getElementById('customerEmail') || {}).value.trim(),
     customer_first_name: firstName,
-    customer_last_name: lastName,
+    customer_phone: customerPhone,
     delivery_address: deliveryAddress,
     rear_seat: !!(document.getElementById('backSeatCheckbox') || {}).checked
   });

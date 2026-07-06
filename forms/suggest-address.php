@@ -73,9 +73,18 @@ if (is_array($data) && !empty($data['suggestions']) && is_array($data['suggestio
     if (!empty($item['data']) && is_array($item['data']) && !empty($item['data']['postal_code'])) {
       $postal = (string) $item['data']['postal_code'];
     }
+    $flat = '';
+    if (!empty($item['data']) && is_array($item['data']) && !empty($item['data']['flat'])) {
+      $flat = trim((string) $item['data']['flat']);
+    }
+    $hasFlat = $flat !== '' || (bool) preg_match(
+      '/(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?|apt\.?)\s*[0-9]+/iu',
+      $value
+    );
     $suggestions[] = [
       'value' => $value,
       'postal_code' => $postal,
+      'has_flat' => $hasFlat,
     ];
   }
 }

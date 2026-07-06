@@ -280,15 +280,16 @@
             <input type="text" id="customerFirstName" class="customer-email-input" placeholder="Иван" autocomplete="given-name" maxlength="80" oninput="updateConsentStatus()">
           </div>
           <div class="order-field">
-            <label class="customer-email-label" for="customerLastName">Фамилия</label>
-            <input type="text" id="customerLastName" class="customer-email-input" placeholder="Иванов" autocomplete="family-name" maxlength="80" oninput="updateConsentStatus()">
+            <label class="customer-email-label" for="customerPhone">Телефон</label>
+            <input type="tel" id="customerPhone" class="customer-email-input" placeholder="+7 900 123-45-67" autocomplete="tel" inputmode="tel" maxlength="20" oninput="updateConsentStatus()">
           </div>
         </div>
         <label class="customer-email-label" for="deliveryAddress">Адрес доставки</label>
         <div class="address-suggest" id="addressSuggest">
-          <input type="text" id="deliveryAddress" class="customer-email-input" placeholder="Начните вводить город, улицу, дом" autocomplete="off" maxlength="500" oninput="onAddressInput()">
+          <input type="text" id="deliveryAddress" class="customer-email-input" placeholder="Город, улица, дом, квартира" autocomplete="off" maxlength="500" oninput="onAddressInput()">
           <ul class="address-suggestions" id="addressSuggestions" role="listbox" hidden></ul>
         </div>
+        <p class="address-hint" id="addressHint">Укажите полный адрес с номером квартиры</p>
       </div>
 
       <p class="messenger-note">Оплата через ЮKassa.</p>

@@ -4,6 +4,13 @@
  */
 const DADATA_URL = 'https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address';
 
+function addressHasApartment(addr) {
+  const value = String(addr || '').trim();
+  if (value.length < 8) return false;
+  return /(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?|apt\.?)\s*[0-9]+[a-zа-я]?/iu.test(value)
+    || /(?:^|[,\s])к\s*[0-9]+/iu.test(value);
+}
+
 function sendJson(res, status, obj) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -67,9 +74,12 @@ module.exports = async function handler(req, res) {
         const value = String(item.value || item.unrestricted_value || '').trim();
         if (!value) return null;
         const postal = item.data && item.data.postal_code ? String(item.data.postal_code) : '';
+        const flat = item.data && item.data.flat ? String(item.data.flat).trim() : '';
+        const hasFlat = flat !== '' || addressHasApartment(value);
         return {
           value,
           postal_code: postal,
+          has_flat: hasFlat,
         };
       })
       .filter(Boolean);

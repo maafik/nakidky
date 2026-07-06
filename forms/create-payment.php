@@ -47,13 +47,46 @@ if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL))
 }
 
 $firstName = isset($input['customer_first_name']) ? trim((string) $input['customer_first_name']) : '';
-$lastName = isset($input['customer_last_name']) ? trim((string) $input['customer_last_name']) : '';
+$customerPhone = isset($input['customer_phone'])
+  ? trim((string) $input['customer_phone'])
+  : (isset($input['customer_last_name']) ? trim((string) $input['customer_last_name']) : '');
 $deliveryAddress = isset($input['delivery_address']) ? trim((string) $input['delivery_address']) : '';
 $rearSeat = !empty($input['rear_seat']);
 $lenFn = function_exists('mb_strlen') ? 'mb_strlen' : 'strlen';
-if ($lenFn($firstName) < 2 || $lenFn($lastName) < 2 || $lenFn($deliveryAddress) < 5) {
+
+function normalize_phone_digits($phone) {
+  $digits = preg_replace('/\D/', '', (string) $phone);
+  if (strlen($digits) === 11 && $digits[0] === '8') {
+    $digits = '7' . substr($digits, 1);
+  }
+  if (strlen($digits) === 10 && $digits[0] === '9') {
+    $digits = '7' . $digits;
+  }
+  return $digits;
+}
+
+function is_valid_ru_phone($phone) {
+  $digits = normalize_phone_digits($phone);
+  return strlen($digits) === 11 && preg_match('/^7[3-9]\d{9}$/', $digits);
+}
+
+function delivery_address_has_apartment($addr) {
+  $value = trim((string) $addr);
+  if ($value === '' || (function_exists('mb_strlen') ? mb_strlen($value) : strlen($value)) < 8) {
+    return false;
+  }
+  return (bool) preg_match('/(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?|apt\.?)\s*[0-9]+/iu', $value)
+    || (bool) preg_match('/(?:^|[,\s])к\s*[0-9]+/iu', $value);
+}
+
+if ($lenFn($firstName) < 2 || !is_valid_ru_phone($customerPhone)) {
   http_response_code(400);
-  echo json_encode(['error' => 'Укажите имя, фамилию и адрес доставки'], JSON_UNESCAPED_UNICODE);
+  echo json_encode(['error' => 'Укажите имя и корректный номер телефона'], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+if (!delivery_address_has_apartment($deliveryAddress)) {
+  http_response_code(400);
+  echo json_encode(['error' => 'Укажите полный адрес доставки с номером квартиры'], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
@@ -102,7 +135,7 @@ $payload = [
   'description' => $description,
   'metadata' => [
     'customer_first_name' => function_exists('mb_substr') ? mb_substr($firstName, 0, 200) : substr($firstName, 0, 200),
-    'customer_last_name' => function_exists('mb_substr') ? mb_substr($lastName, 0, 200) : substr($lastName, 0, 200),
+    'customer_phone' => function_exists('mb_substr') ? mb_substr($customerPhone, 0, 50) : substr($customerPhone, 0, 50),
     'delivery_address' => function_exists('mb_substr') ? mb_substr($deliveryAddress, 0, 500) : substr($deliveryAddress, 0, 500),
     'rear_seat' => $rearSeat ? 'yes' : 'no',
   ],
@@ -182,7 +215,7 @@ if ($tgToken !== '' && $tgChat !== '') {
     . 'Товар: ' . $description . "\n"
     . 'Сумма: ' . (string) (int) round($amountRub) . " ₽\n"
     . 'Имя: ' . $firstName . "\n"
-    . 'Фамилия: ' . $lastName . "\n"
+    . 'Телефон: ' . $customerPhone . "\n"
     . 'Email: ' . $customerEmail . "\n"
     . 'Адрес: ' . $deliveryAddress . "\n"
     . 'Задний ряд (+2000 ₽): ' . ($rearSeat ? 'да' : 'нет');
