@@ -646,7 +646,33 @@ async function startPayment() {
   }
 }
 
+function ensureOrderFormFields() {
+  let phoneInput = document.getElementById('customerPhone');
+  const legacyLastName = document.getElementById('customerLastName');
+
+  if (!phoneInput && legacyLastName) {
+    legacyLastName.id = 'customerPhone';
+    phoneInput = legacyLastName;
+  }
+
+  if (!phoneInput) return;
+
+  phoneInput.type = 'tel';
+  phoneInput.placeholder = '+7 900 123-45-67';
+  phoneInput.autocomplete = 'tel';
+  phoneInput.inputMode = 'tel';
+  phoneInput.maxLength = 20;
+  phoneInput.setAttribute('oninput', 'updateConsentStatus()');
+
+  const phoneLabel = document.querySelector('label[for="customerPhone"], label[for="customerLastName"]');
+  if (phoneLabel) {
+    phoneLabel.textContent = 'Телефон';
+    phoneLabel.setAttribute('for', 'customerPhone');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  ensureOrderFormFields();
   const payBtn = document.getElementById('payButton');
   if (payBtn) payBtn.addEventListener('click', startPayment);
   initAddressSuggest();
