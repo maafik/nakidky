@@ -200,10 +200,11 @@ function openOrderForm() {
 
   const fn = document.getElementById('customerFirstName');
   const ln = document.getElementById('customerLastName');
-  const addr = document.getElementById('deliveryAddress');
   if (fn) fn.value = '';
   if (ln) ln.value = '';
+  const addr = document.getElementById('deliveryAddress');
   if (addr) addr.value = '';
+  hideAddressSuggestions();
 
   updatePrice();
   updateConsentStatus();
@@ -291,6 +292,180 @@ function isValidOrderDeliveryFields() {
 }
 
 const PAY_BUTTON_LABEL = 'Оплатить';
+
+let addressSearchTimer = null;
+let addressSearchSeq = 0;
+let addressActiveIndex = -1;
+
+function getAddressSuggestEndpoints() {
+  const custom =
+    typeof window.PAYMENT_API_BASE === 'string' ? window.PAYMENT_API_BASE.trim().replace(/\/$/, '') : '';
+  if (custom) {
+    return [new URL('/api/suggest-address', custom + '/').href];
+  }
+  const origin = window.location.origin;
+  return [
+    new URL('/api/suggest-address', origin + '/').href,
+    new URL('/forms/suggest-address.php', origin + '/').href
+  ];
+}
+
+function hideAddressSuggestions() {
+  const list = document.getElementById('addressSuggestions');
+  if (!list) return;
+  list.innerHTML = '';
+  list.hidden = true;
+  addressActiveIndex = -1;
+}
+
+function showAddressStatus(message) {
+  const list = document.getElementById('addressSuggestions');
+  if (!list) return;
+  list.innerHTML = '';
+  const li = document.createElement('li');
+  li.className = 'address-suggestion address-suggestion--status';
+  li.textContent = message;
+  li.setAttribute('role', 'presentation');
+  list.appendChild(li);
+  list.hidden = false;
+}
+
+function selectAddressSuggestion(item) {
+  const input = document.getElementById('deliveryAddress');
+  if (!input) return;
+  input.value = item.value || '';
+  hideAddressSuggestions();
+  updateConsentStatus();
+}
+
+function renderAddressSuggestions(items) {
+  const list = document.getElementById('addressSuggestions');
+  if (!list) return;
+
+  list.innerHTML = '';
+  if (!items.length) {
+    showAddressStatus('Адреса не найдены — уточните запрос');
+    return;
+  }
+
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    li.className = 'address-suggestion';
+    li.setAttribute('role', 'option');
+
+    const title = document.createElement('span');
+    title.className = 'address-suggestion-title';
+    title.textContent = item.value;
+    li.appendChild(title);
+
+    li.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      selectAddressSuggestion(item);
+    });
+    list.appendChild(li);
+  });
+
+  list.hidden = false;
+  addressActiveIndex = -1;
+}
+
+async function fetchAddressSuggestions(query) {
+  const seq = ++addressSearchSeq;
+  showAddressStatus('Ищем адреса…');
+
+  let lastError = '';
+  for (const url of getAddressSuggestEndpoints()) {
+    try {
+      const res = await fetch(`${url}?q=${encodeURIComponent(query)}`, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: { Accept: 'application/json' }
+      });
+      const text = await res.text();
+      if (text.trim().startsWith('<')) continue;
+
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        continue;
+      }
+
+      if (seq !== addressSearchSeq) return;
+
+      if (!res.ok) {
+        lastError = data.error || `Ошибка ${res.status}`;
+        continue;
+      }
+
+      renderAddressSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+      return;
+    } catch {
+      /* try next endpoint */
+    }
+  }
+
+  if (seq !== addressSearchSeq) return;
+  showAddressStatus(lastError || 'Не удалось загрузить подсказки — введите адрес вручную');
+}
+
+function onAddressInput() {
+  updateConsentStatus();
+
+  const input = document.getElementById('deliveryAddress');
+  if (!input) return;
+
+  const query = input.value.trim();
+  clearTimeout(addressSearchTimer);
+  if (query.length < 2) {
+    hideAddressSuggestions();
+    return;
+  }
+
+  addressSearchTimer = setTimeout(() => {
+    fetchAddressSuggestions(query);
+  }, 320);
+}
+
+function highlightAddressSuggestion(items) {
+  items.forEach((item, i) => {
+    item.classList.toggle('address-suggestion--active', i === addressActiveIndex);
+  });
+}
+
+function initAddressSuggest() {
+  const input = document.getElementById('deliveryAddress');
+  const list = document.getElementById('addressSuggestions');
+  const wrap = document.getElementById('addressSuggest');
+  if (!input || !list || !wrap) return;
+
+  input.addEventListener('keydown', (event) => {
+    const items = list.hidden ? [] : Array.from(list.querySelectorAll('.address-suggestion:not(.address-suggestion--status)'));
+    if (!items.length) return;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      addressActiveIndex = Math.min(addressActiveIndex + 1, items.length - 1);
+      highlightAddressSuggestion(items);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      addressActiveIndex = Math.max(addressActiveIndex - 1, 0);
+      highlightAddressSuggestion(items);
+    } else if (event.key === 'Enter' && addressActiveIndex >= 0) {
+      event.preventDefault();
+      items[addressActiveIndex].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    } else if (event.key === 'Escape') {
+      hideAddressSuggestions();
+    }
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!wrap.contains(event.target)) {
+      hideAddressSuggestions();
+    }
+  });
+}
 
 function resetPayButtonIfLoading() {
   const btn = document.getElementById('payButton');
@@ -415,6 +590,7 @@ async function startPayment() {
 document.addEventListener('DOMContentLoaded', () => {
   const payBtn = document.getElementById('payButton');
   if (payBtn) payBtn.addEventListener('click', startPayment);
+  initAddressSuggest();
   updateConsentStatus();
 });
 

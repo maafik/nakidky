@@ -4,4 +4,5 @@
   RewriteBase /
   RewriteRule ^create-payment\.php$ - [L]
   RewriteRule ^forms/create-payment\.php$ - [L]
+  RewriteRule ^forms/suggest-address\.php$ - [L]
 </IfModule>

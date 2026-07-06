@@ -285,10 +285,14 @@
           </div>
         </div>
         <label class="customer-email-label" for="deliveryAddress">Адрес доставки</label>
-        <textarea id="deliveryAddress" class="customer-email-input order-address-textarea" placeholder="Город, улица, дом, квартира, индекс" rows="3" maxlength="500" oninput="updateConsentStatus()"></textarea>
+        <div class="address-suggest" id="addressSuggest">
+          <input type="text" id="deliveryAddress" class="customer-email-input" placeholder="Начните вводить город, улицу, дом" autocomplete="off" maxlength="500" oninput="onAddressInput()">
+          <ul class="address-suggestions" id="addressSuggestions" role="listbox" hidden></ul>
+        </div>
       </div>
 
-      <p class="messenger-note">Оплата банковской картой через ЮKassa.</p>
+      <p class="messenger-note">Оплата через ЮKassa.</p>
+      <p class="order-universal-note">Автонакидки подходят на все автомобили!</p>
       <div class="popup-messengers">
         <button type="button" id="payButton" class="whatsapp-btn" disabled>Оплатить</button>
       </div>

@@ -2654,6 +2654,70 @@ section,
   line-height: 1.4;
 }
 
+.address-suggest {
+  position: relative;
+}
+
+.address-suggestions {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.address-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.address-suggestion:last-child {
+  border-bottom: none;
+}
+
+.address-suggestion:hover,
+.address-suggestion--active {
+  background: #2a2a2a;
+}
+
+.address-suggestion--status {
+  cursor: default;
+  color: #b0b0b0;
+  font-size: 13px;
+}
+
+.address-suggestion--status:hover {
+  background: transparent;
+}
+
+.address-suggestion-title {
+  font-size: 14px;
+  color: #f0f0f0;
+  line-height: 1.35;
+}
+
+.order-universal-note {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #d4d4d4;
+  text-align: left;
+  font-weight: 500;
+}
+
 @media (max-width: 480px) {
   .order-fields-row {
     grid-template-columns: 1fr;
