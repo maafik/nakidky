@@ -70,13 +70,24 @@ function is_valid_ru_phone($phone) {
   return strlen($digits) === 11 && preg_match('/^7[3-9]\d{9}$/', $digits);
 }
 
+function delivery_address_has_house($addr) {
+  $value = trim((string) $addr);
+  if ($value === '') return false;
+  return (bool) preg_match('/(?:^|[,\s])(?:д\.?|дом)\s*[0-9]+/iu', $value)
+    || (bool) preg_match('/(?:^|[,\s])стр\.?\s*[0-9]+/iu', $value);
+}
+
 function delivery_address_has_apartment($addr) {
   $value = trim((string) $addr);
-  if ($value === '' || (function_exists('mb_strlen') ? mb_strlen($value) : strlen($value)) < 8) {
-    return false;
-  }
-  return (bool) preg_match('/(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?|apt\.?)\s*[0-9]+/iu', $value)
-    || (bool) preg_match('/(?:^|[,\s])к\s*[0-9]+/iu', $value);
+  if ($value === '') return false;
+  return (bool) preg_match('/(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?)\s*[0-9]+/iu', $value);
+}
+
+function is_valid_full_delivery_address($addr) {
+  $value = trim((string) $addr);
+  $len = function_exists('mb_strlen') ? mb_strlen($value) : strlen($value);
+  if ($len < 10) return false;
+  return delivery_address_has_house($value) && delivery_address_has_apartment($value);
 }
 
 if ($lenFn($firstName) < 2 || !is_valid_ru_phone($customerPhone)) {
@@ -84,9 +95,12 @@ if ($lenFn($firstName) < 2 || !is_valid_ru_phone($customerPhone)) {
   echo json_encode(['error' => 'Укажите имя и корректный номер телефона'], JSON_UNESCAPED_UNICODE);
   exit;
 }
-if (!delivery_address_has_apartment($deliveryAddress)) {
+if (!is_valid_full_delivery_address($deliveryAddress)) {
   http_response_code(400);
-  echo json_encode(['error' => 'Укажите полный адрес доставки с номером квартиры'], JSON_UNESCAPED_UNICODE);
+  $msg = delivery_address_has_house($deliveryAddress)
+    ? 'Укажите номер квартиры в адресе доставки'
+    : 'Укажите номер дома в адресе доставки';
+  echo json_encode(['error' => $msg], JSON_UNESCAPED_UNICODE);
   exit;
 }
 

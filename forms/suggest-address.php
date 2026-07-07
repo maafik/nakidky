@@ -78,13 +78,14 @@ if (is_array($data) && !empty($data['suggestions']) && is_array($data['suggestio
       $flat = trim((string) $item['data']['flat']);
     }
     $hasFlat = $flat !== '' || (bool) preg_match(
-      '/(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?|apt\.?)\s*[0-9]+/iu',
+      '/(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?)\s*[0-9]+/iu',
       $value
     );
+    if (!$hasFlat) continue;
     $suggestions[] = [
       'value' => $value,
       'postal_code' => $postal,
-      'has_flat' => $hasFlat,
+      'has_flat' => true,
     ];
   }
 }

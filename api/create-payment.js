@@ -66,11 +66,23 @@ function isValidRussianPhone(phone) {
   return digits.length === 11 && /^7[3-9]\d{9}$/.test(digits);
 }
 
+function addressHasHouse(addr) {
+  const value = String(addr || '').trim();
+  if (!value) return false;
+  return /(?:^|[,\s])(?:д\.?|дом)\s*[0-9]+[a-zа-я0-9/-]*/iu.test(value)
+    || /(?:^|[,\s])стр\.?\s*[0-9]+/iu.test(value);
+}
+
 function addressHasApartment(addr) {
   const value = String(addr || '').trim();
-  if (value.length < 8) return false;
-  return /(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?|apt\.?)\s*[0-9]+[a-zа-я]?/iu.test(value)
-    || /(?:^|[,\s])к\s*[0-9]+/iu.test(value);
+  if (!value) return false;
+  return /(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?)\s*[0-9]+[a-zа-я]?/iu.test(value);
+}
+
+function isValidFullDeliveryAddress(addr) {
+  const value = String(addr || '').trim();
+  if (value.length < 10) return false;
+  return addressHasHouse(value) && addressHasApartment(value);
 }
 
 /** Уведомление в Telegram (токен и chat_id только в Vercel → Environment Variables) */
@@ -166,8 +178,11 @@ module.exports = async function handler(req, res) {
   if (firstName.length < 2 || !isValidRussianPhone(customerPhone)) {
     return sendJson(res, 400, { error: 'Укажите имя и корректный номер телефона' });
   }
-  if (!addressHasApartment(deliveryAddress)) {
-    return sendJson(res, 400, { error: 'Укажите полный адрес доставки с номером квартиры' });
+  if (!isValidFullDeliveryAddress(deliveryAddress)) {
+    if (!addressHasHouse(deliveryAddress)) {
+      return sendJson(res, 400, { error: 'Укажите номер дома в адресе доставки' });
+    }
+    return sendJson(res, 400, { error: 'Укажите номер квартиры в адресе доставки' });
   }
 
   if (!Number.isFinite(amountRub) || amountRub < 1 || amountRub > 500000) {

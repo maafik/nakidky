@@ -299,11 +299,23 @@ function isValidCustomerPhone() {
   return digits.length === 11 && /^7[3-9]\d{9}$/.test(digits);
 }
 
+function addressHasHouse(addr) {
+  const value = String(addr || '').trim();
+  if (!value) return false;
+  return /(?:^|[,\s])(?:д\.?|дом)\s*[0-9]+[a-zа-я0-9/-]*/iu.test(value)
+    || /(?:^|[,\s])стр\.?\s*[0-9]+/iu.test(value);
+}
+
 function addressHasApartment(addr) {
   const value = String(addr || '').trim();
-  if (value.length < 8) return false;
-  return /(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?|apt\.?)\s*[0-9]+[a-zа-я]?/iu.test(value)
-    || /(?:^|[,\s])к\s*[0-9]+/iu.test(value);
+  if (!value) return false;
+  return /(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?)\s*[0-9]+[a-zа-я]?/iu.test(value);
+}
+
+function isValidFullDeliveryAddress(addr) {
+  const value = String(addr || '').trim();
+  if (value.length < 10) return false;
+  return addressHasHouse(value) && addressHasApartment(value);
 }
 
 function isValidOrderDeliveryFields() {
@@ -313,7 +325,7 @@ function isValidOrderDeliveryFields() {
   if (!f || !p || !a) return false;
   const first = f.value.trim();
   const addr = a.value.trim();
-  return first.length >= 2 && isValidCustomerPhone() && addressHasApartment(addr);
+  return first.length >= 2 && isValidCustomerPhone() && isValidFullDeliveryAddress(addr);
 }
 
 function updateAddressHint() {
@@ -322,15 +334,23 @@ function updateAddressHint() {
   if (!hint || !addrEl) return;
   const addr = addrEl.value.trim();
   if (!addr) {
-    hint.textContent = 'Укажите полный адрес с номером квартиры';
+    hint.textContent = 'Укажите адрес с номером дома и квартиры';
     hint.classList.remove('address-hint--ok');
     return;
   }
-  if (addressHasApartment(addr)) {
+  const hasHouse = addressHasHouse(addr);
+  const hasFlat = addressHasApartment(addr);
+  if (hasHouse && hasFlat) {
     hint.textContent = 'Адрес указан полностью';
     hint.classList.add('address-hint--ok');
-  } else {
+  } else if (hasHouse && !hasFlat) {
     hint.textContent = 'Добавьте номер квартиры (например: кв 12)';
+    hint.classList.remove('address-hint--ok');
+  } else if (!hasHouse && hasFlat) {
+    hint.textContent = 'Добавьте номер дома (например: д 5)';
+    hint.classList.remove('address-hint--ok');
+  } else {
+    hint.textContent = 'Укажите дом и квартиру (например: ул Ленина 1 кв 12)';
     hint.classList.remove('address-hint--ok');
   }
 }
@@ -388,12 +408,13 @@ function renderAddressSuggestions(items) {
   if (!list) return;
 
   list.innerHTML = '';
-  if (!items.length) {
-    showAddressStatus('Адреса не найдены — уточните запрос');
+  const withFlat = items.filter((item) => item.has_flat);
+  if (!withFlat.length) {
+    showAddressStatus('Укажите дом и квартиру, например: ул Ленина 1 кв 12');
     return;
   }
 
-  items.forEach((item) => {
+  withFlat.forEach((item) => {
     const li = document.createElement('li');
     li.className = 'address-suggestion';
     li.setAttribute('role', 'option');
@@ -404,10 +425,7 @@ function renderAddressSuggestions(items) {
     li.appendChild(title);
 
     if (item.has_flat === false) {
-      const meta = document.createElement('span');
-      meta.className = 'address-suggestion-meta';
-      meta.textContent = 'Добавьте квартиру в запрос';
-      li.appendChild(meta);
+      return;
     }
 
     li.addEventListener('mousedown', (event) => {
@@ -571,8 +589,14 @@ async function startPayment() {
   const customerPhone = (document.getElementById('customerPhone') || {}).value.trim();
   const deliveryAddress = (document.getElementById('deliveryAddress') || {}).value.trim();
   if (!isValidOrderDeliveryFields()) {
-    if (!addressHasApartment(deliveryAddress)) {
-      alert('Укажите полный адрес доставки с номером квартиры.');
+    if (!isValidFullDeliveryAddress(deliveryAddress)) {
+      if (!addressHasHouse(deliveryAddress)) {
+        alert('Укажите номер дома в адресе доставки.');
+      } else if (!addressHasApartment(deliveryAddress)) {
+        alert('Укажите номер квартиры в адресе доставки.');
+      } else {
+        alert('Укажите полный адрес: дом и квартира.');
+      }
     } else if (!isValidCustomerPhone()) {
       alert('Укажите корректный номер телефона.');
     } else {

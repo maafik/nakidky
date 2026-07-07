@@ -4,11 +4,23 @@
  */
 const DADATA_URL = 'https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address';
 
+function addressHasHouse(addr) {
+  const value = String(addr || '').trim();
+  if (!value) return false;
+  return /(?:^|[,\s])(?:д\.?|дом)\s*[0-9]+[a-zа-я0-9/-]*/iu.test(value)
+    || /(?:^|[,\s])стр\.?\s*[0-9]+/iu.test(value);
+}
+
 function addressHasApartment(addr) {
   const value = String(addr || '').trim();
-  if (value.length < 8) return false;
-  return /(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?|apt\.?)\s*[0-9]+[a-zа-я]?/iu.test(value)
-    || /(?:^|[,\s])к\s*[0-9]+/iu.test(value);
+  if (!value) return false;
+  return /(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?)\s*[0-9]+[a-zа-я]?/iu.test(value);
+}
+
+function isValidFullDeliveryAddress(addr) {
+  const value = String(addr || '').trim();
+  if (value.length < 10) return false;
+  return addressHasHouse(value) && addressHasApartment(value);
 }
 
 function sendJson(res, status, obj) {
@@ -75,11 +87,15 @@ module.exports = async function handler(req, res) {
         if (!value) return null;
         const postal = item.data && item.data.postal_code ? String(item.data.postal_code) : '';
         const flat = item.data && item.data.flat ? String(item.data.flat).trim() : '';
+        const house = item.data && item.data.house ? String(item.data.house).trim() : '';
         const hasFlat = flat !== '' || addressHasApartment(value);
+        const hasHouse = house !== '' || addressHasHouse(value);
+        if (!hasFlat) return null;
         return {
           value,
           postal_code: postal,
-          has_flat: hasFlat,
+          has_flat: true,
+          has_house: hasHouse,
         };
       })
       .filter(Boolean);
