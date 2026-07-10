@@ -286,16 +286,52 @@
         </div>
         <label class="customer-email-label" for="deliveryAddress">Адрес доставки</label>
         <div class="address-suggest" id="addressSuggest">
-          <input type="text" id="deliveryAddress" class="customer-email-input" placeholder="Город, улица, дом, квартира (например: д 1 кв 12)" autocomplete="off" maxlength="500" oninput="onAddressInput()">
+          <textarea id="deliveryAddress" class="customer-email-input order-address-textarea" rows="2" placeholder="Город, улица, дом&#10;Квартира (например: д 1 кв 12)" autocomplete="off" maxlength="500" oninput="onAddressInput()"></textarea>
           <ul class="address-suggestions" id="addressSuggestions" role="listbox" hidden></ul>
         </div>
         <p class="address-hint" id="addressHint">Укажите адрес с номером дома и квартиры</p>
       </div>
 
-      <p class="messenger-note">Оплата через ЮKassa.</p>
-      <p class="order-universal-note">Автонакидки подходят на все автомобили!</p>
+      <p class="messenger-note">Проверьте данные и перейдите к подтверждению заказа.</p>
       <div class="popup-messengers">
-        <button type="button" id="payButton" class="whatsapp-btn" disabled>Оплатить</button>
+        <button type="button" id="proceedToConfirmBtn" class="whatsapp-btn" disabled>Далее</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Попап 3: подтверждение перед оплатой -->
+<div class="order-popup order-popup-confirm" id="orderPopupConfirm" onclick="closeOrderConfirm(event)">
+  <div class="order-content order-content-confirm" onclick="event.stopPropagation()">
+    <div class="close-btn" onclick="closeOrderConfirm(event)">✖</div>
+    <div class="order-image order-image-confirm">
+      <img id="confirmImage" src="" alt="Эскиз автонакидки">
+      <p class="confirm-sketch-caption"></p>
+    </div>
+    <div class="order-details order-details-confirm">
+      <button type="button" class="order-back-link" onclick="backToOrderForm(event)">← Изменить данные</button>
+      <h3 id="confirmTitle">Название товара</h3>
+      <p id="confirmPrice" class="confirm-price">Цена: </p>
+
+      <div class="confirm-summary">
+        <div class="confirm-row">
+          <span class="confirm-label">Имя</span>
+          <span class="confirm-value" id="confirmName"></span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Телефон</span>
+          <span class="confirm-value" id="confirmPhone"></span>
+        </div>
+        <div class="confirm-row confirm-row-address">
+          <span class="confirm-label">Адрес</span>
+          <span class="confirm-value" id="confirmAddress"></span>
+        </div>
+      </div>
+
+      <p class="order-universal-note order-universal-note--confirm">Автонакидки подходят на все сиденья автомобилей!</p>
+      <p class="messenger-note">Оплата банковской картой через ЮKassa.</p>
+      <div class="popup-messengers">
+        <button type="button" id="payButton" class="whatsapp-btn">Оплатить</button>
       </div>
     </div>
   </div>

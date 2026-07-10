@@ -146,6 +146,8 @@ function openOrder(image, title, price) {
   document.getElementById('popupPreviewTitle').innerText = title;
 
   document.getElementById('orderPopup').style.display = 'none';
+  const confirmPopup = document.getElementById('orderPopupConfirm');
+  if (confirmPopup) confirmPopup.style.display = 'none';
 
   const rearSeatCheckbox = document.getElementById('backSeatCheckbox');
   if (rearSeatCheckbox) rearSeatCheckbox.checked = false;
@@ -193,6 +195,8 @@ function proceedToCheckoutForm(event) {
 
 function openOrderForm() {
   const popup = document.getElementById('orderPopup');
+  const confirmPopup = document.getElementById('orderPopupConfirm');
+  if (confirmPopup) confirmPopup.style.display = 'none';
   popup.style.display = 'flex';
 
   document.getElementById('popupImage').src = selectedItem.image;
@@ -217,10 +221,81 @@ function openOrderForm() {
   };
 }
 
+/** Из формы — к экрану подтверждения перед оплатой */
+function proceedToConfirmOrder(event) {
+  if (event) event.stopPropagation();
+  const deliveryAddress = (document.getElementById('deliveryAddress') || {}).value.trim();
+  if (!isValidOrderDeliveryFields()) {
+    if (!isValidFullDeliveryAddress(deliveryAddress)) {
+      if (!addressHasHouse(deliveryAddress)) {
+        alert('Укажите номер дома в адресе доставки.');
+      } else if (!addressHasApartment(deliveryAddress)) {
+        alert('Укажите номер квартиры в адресе доставки.');
+      } else {
+        alert('Укажите полный адрес: дом и квартира.');
+      }
+    } else if (!isValidCustomerPhone()) {
+      alert('Укажите корректный номер телефона.');
+    } else {
+      alert('Заполните имя, телефон и адрес доставки.');
+    }
+    return;
+  }
+  openOrderConfirm();
+}
+
+function openOrderConfirm() {
+  const popup = document.getElementById('orderPopupConfirm');
+  if (!popup) return;
+
+  document.getElementById('orderPopup').style.display = 'none';
+
+  const firstName = (document.getElementById('customerFirstName') || {}).value.trim();
+  const phoneRaw = (document.getElementById('customerPhone') || {}).value.trim();
+  const deliveryAddress = (document.getElementById('deliveryAddress') || {}).value.trim();
+
+  const confirmImage = document.getElementById('confirmImage');
+  const confirmTitle = document.getElementById('confirmTitle');
+  const confirmPrice = document.getElementById('confirmPrice');
+  const confirmName = document.getElementById('confirmName');
+  const confirmPhone = document.getElementById('confirmPhone');
+  const confirmAddress = document.getElementById('confirmAddress');
+
+  if (confirmImage) confirmImage.src = selectedItem.image;
+  if (confirmTitle) confirmTitle.innerText = selectedItem.title;
+  if (confirmPrice) confirmPrice.innerText = `Цена: ${totalPrice} ₽`;
+  if (confirmName) confirmName.textContent = firstName;
+  if (confirmPhone) confirmPhone.textContent = formatPhoneDisplay(phoneRaw);
+  if (confirmAddress) confirmAddress.textContent = deliveryAddress;
+
+  resetPayButtonIfLoading();
+  popup.style.display = 'flex';
+  popup.onclick = function (event) {
+    if (event.target === popup) {
+      backToOrderForm();
+    }
+  };
+}
+
+/** Из подтверждения — назад к форме доставки */
+function backToOrderForm(event) {
+  if (event) event.stopPropagation();
+  const confirmPopup = document.getElementById('orderPopupConfirm');
+  if (confirmPopup) confirmPopup.style.display = 'none';
+  resetPayButtonIfLoading();
+  openOrderForm();
+}
+
+function closeOrderConfirm(event) {
+  backToOrderForm(event);
+}
+
 /** Из формы — назад к превью товара */
 function backToProductPreview(event) {
   if (event) event.stopPropagation();
   document.getElementById('orderPopup').style.display = 'none';
+  const confirmPopup = document.getElementById('orderPopupConfirm');
+  if (confirmPopup) confirmPopup.style.display = 'none';
   resetPayButtonIfLoading();
 
   document.getElementById('popupPreviewImage').src = selectedItem.image;
@@ -299,21 +374,31 @@ function isValidCustomerPhone() {
   return digits.length === 11 && /^7[3-9]\d{9}$/.test(digits);
 }
 
+function normalizeAddressValue(addr) {
+  return String(addr || '').trim().replace(/\s*\n+\s*/g, ', ').replace(/\s{2,}/g, ' ');
+}
+
+function formatPhoneDisplay(raw) {
+  const digits = normalizePhone(raw);
+  if (digits.length !== 11) return String(raw || '').trim();
+  return `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 9)}-${digits.slice(9, 11)}`;
+}
+
 function addressHasHouse(addr) {
-  const value = String(addr || '').trim();
+  const value = normalizeAddressValue(addr);
   if (!value) return false;
   return /(?:^|[,\s])(?:д\.?|дом)\s*[0-9]+[a-zа-я0-9/-]*/iu.test(value)
     || /(?:^|[,\s])стр\.?\s*[0-9]+/iu.test(value);
 }
 
 function addressHasApartment(addr) {
-  const value = String(addr || '').trim();
+  const value = normalizeAddressValue(addr);
   if (!value) return false;
   return /(?:^|[,\s])(?:кв\.?|квартира|кварт\.?|оф\.?|офис|пом\.?|помещ\.?)\s*[0-9]+[a-zа-я]?/iu.test(value);
 }
 
 function isValidFullDeliveryAddress(addr) {
-  const value = String(addr || '').trim();
+  const value = normalizeAddressValue(addr);
   if (value.length < 10) return false;
   return addressHasHouse(value) && addressHasApartment(value);
 }
@@ -548,17 +633,13 @@ function resetPayButtonIfLoading() {
 }
 
 function updateConsentStatus() {
-  const policyCheckbox = document.getElementById('policyAgree');
-  const returnCheckbox = document.getElementById('returnAgree');
-  const payButton = document.getElementById('payButton');
-
-  if (!payButton) return;
-  const checksOk = policyCheckbox && returnCheckbox ? (policyCheckbox.checked && returnCheckbox.checked) : true;
-  const isAllowed = checksOk && isValidCustomerEmail() && isValidOrderDeliveryFields();
-
-  payButton.disabled = !isAllowed;
-  payButton.classList.toggle('disabled', !isAllowed);
-  payButton.setAttribute('aria-disabled', (!isAllowed).toString());
+  const proceedBtn = document.getElementById('proceedToConfirmBtn');
+  if (proceedBtn) {
+    const isAllowed = isValidOrderDeliveryFields();
+    proceedBtn.disabled = !isAllowed;
+    proceedBtn.classList.toggle('disabled', !isAllowed);
+    proceedBtn.setAttribute('aria-disabled', (!isAllowed).toString());
+  }
 }
 
 function getPaymentEndpoints() {
@@ -587,7 +668,7 @@ async function startPayment() {
 
   const firstName = (document.getElementById('customerFirstName') || {}).value.trim();
   const customerPhone = (document.getElementById('customerPhone') || {}).value.trim();
-  const deliveryAddress = (document.getElementById('deliveryAddress') || {}).value.trim();
+  const deliveryAddress = normalizeAddressValue((document.getElementById('deliveryAddress') || {}).value);
   if (!isValidOrderDeliveryFields()) {
     if (!isValidFullDeliveryAddress(deliveryAddress)) {
       if (!addressHasHouse(deliveryAddress)) {
@@ -697,6 +778,8 @@ function ensureOrderFormFields() {
 
 document.addEventListener('DOMContentLoaded', () => {
   ensureOrderFormFields();
+  const proceedBtn = document.getElementById('proceedToConfirmBtn');
+  if (proceedBtn) proceedBtn.addEventListener('click', proceedToConfirmOrder);
   const payBtn = document.getElementById('payButton');
   if (payBtn) payBtn.addEventListener('click', startPayment);
   initAddressSuggest();
@@ -724,8 +807,10 @@ function closeOrder(event) {
   window.onpopstate = function () {
     const form = document.getElementById('orderPopup');
     const preview = document.getElementById('orderPopupPreview');
+    const confirm = document.getElementById('orderPopupConfirm');
     if (form) form.style.display = 'none';
     if (preview) preview.style.display = 'none';
+    if (confirm) confirm.style.display = 'none';
     resetPayButtonIfLoading();
   };
 
