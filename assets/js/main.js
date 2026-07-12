@@ -138,8 +138,8 @@ let selectedItem = {};
 let totalPrice = 0;
 
 /** Клик по карточке: сначала попап с превью товара */
-function openOrder(image, title, price) {
-  selectedItem = { image, title, price: parseInt(price, 10) };
+function openOrder(image, title, price, sketch) {
+  selectedItem = { image, title, price: parseInt(price, 10), sketch: sketch || image };
   totalPrice = selectedItem.price;
 
   document.getElementById('popupPreviewImage').src = image;
@@ -199,7 +199,7 @@ function openOrderForm() {
   if (confirmPopup) confirmPopup.style.display = 'none';
   popup.style.display = 'flex';
 
-  document.getElementById('popupImage').src = selectedItem.image;
+  document.getElementById('popupImage').src = selectedItem.sketch || selectedItem.image;
   document.getElementById('popupTitle').innerText = selectedItem.title;
 
   const fn = document.getElementById('customerFirstName');
@@ -261,7 +261,7 @@ function openOrderConfirm() {
   const confirmPhone = document.getElementById('confirmPhone');
   const confirmAddress = document.getElementById('confirmAddress');
 
-  if (confirmImage) confirmImage.src = selectedItem.image;
+  if (confirmImage) confirmImage.src = selectedItem.sketch || selectedItem.image;
   if (confirmTitle) confirmTitle.innerText = selectedItem.title;
   if (confirmPrice) confirmPrice.innerText = `Цена: ${totalPrice} ₽`;
   if (confirmName) confirmName.textContent = firstName;
